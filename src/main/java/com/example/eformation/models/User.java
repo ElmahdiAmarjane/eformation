@@ -2,32 +2,38 @@ package com.example.eformation.models;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
-@Data                   // Generates getters, setters, toString, equals, hashCode
-@NoArgsConstructor      // Generates no-args constructor
-@AllArgsConstructor     // Generates all-args constructor
-@Builder                // Optional: for builder pattern
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "dtype", discriminatorType = DiscriminatorType.STRING)
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String username;
+    @Column(nullable = false, unique = false, length = 100)
+    private String fullName;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column
-    private String fullName;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role; 
 
-    @Column
-    private String role; // e.g., USER, ADMIN
+    public User(String fullName, String email, String password,  Role role) {
+        this.fullName = fullName;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+    }
 }
