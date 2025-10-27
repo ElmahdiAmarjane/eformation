@@ -1,4 +1,4 @@
-package com.example.eformation.models;
+package com.example.eformation.models.user;
 
 public enum Role {
     ADMIN,

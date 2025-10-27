@@ -1,10 +1,11 @@
-package com.example.eformation.models;
+package com.example.eformation.models.user;
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
 @DiscriminatorValue("ETUDIANT")
+@Table(name = "etudiant")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -12,8 +13,8 @@ public class Etudiant extends User {
 
     private boolean isVerfiedByProf;
 
-    public Etudiant(String fullName, String email, String password, Role role) {
-        super(fullName, password, email, role);
+    public Etudiant(String fullName, String email, String password, Role role,String codeOtp) {
+        super(fullName, password, email, role,codeOtp);
         this.isVerfiedByProf=false;
     }
 }

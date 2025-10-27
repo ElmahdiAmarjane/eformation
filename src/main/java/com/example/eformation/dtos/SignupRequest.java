@@ -1,6 +1,6 @@
 package com.example.eformation.dtos;
 
-import com.example.eformation.models.Role;
+import com.example.eformation.models.user.Role;
 
 public class SignupRequest  {
 
@@ -8,7 +8,7 @@ public class SignupRequest  {
     private String email;
     private String password;
     private Role role; 
-    private String uniquePath; //This is for prof optionelle
+    private String uniquePath; 
 
     public String getFullName() {
         return fullName;
