@@ -13,8 +13,9 @@ public class Etudiant extends User {
 
     private boolean isVerfiedByProf;
 
-    public Etudiant(String fullName, String email, String password, Role role,String codeOtp) {
-        super(fullName, password, email, role,codeOtp);
-        this.isVerfiedByProf=false;
+    public Etudiant(String fullName, String email, String password, Role role, String codeOtp) {
+        super(fullName, email, password, role, codeOtp);
+        this.isVerfiedByProf = false;
     }
+    
 }

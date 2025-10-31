@@ -3,6 +3,7 @@ package com.example.eformation.services;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.example.eformation.config.JwtUtils;
 import com.example.eformation.dtos.LoginRequest;
 import com.example.eformation.dtos.LoginResponse;
 import com.example.eformation.dtos.PasswordResetRequestDTO;
@@ -26,6 +27,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final JwtUtils jwtUtils;
 
 
     //SIGNUP
@@ -79,11 +81,14 @@ public class AuthService {
             throw new RuntimeException("User not verified");
         }
 
+        String token = jwtUtils.generateToken(user.getEmail());
+
         // Construire la réponse
         LoginResponse response = new LoginResponse();
         response.setFullName(user.getFullName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
+        response.setToken(token);
 
         return response;
     }
