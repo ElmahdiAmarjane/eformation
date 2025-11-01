@@ -4,16 +4,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.eformation.config.JwtUtils;
-import com.example.eformation.dtos.LoginRequest;
-import com.example.eformation.dtos.LoginResponse;
 import com.example.eformation.dtos.PasswordResetRequestDTO;
 import com.example.eformation.dtos.SignupRequest;
 import com.example.eformation.dtos.UpdatePasswordDTO;
 import com.example.eformation.dtos.VerifyOtpRequest;
+import com.example.eformation.dtos.Login.LoginRequest;
+import com.example.eformation.dtos.Login.LoginResponse;
+import com.example.eformation.models.Packs.Pack;
 import com.example.eformation.models.user.Admin;
 import com.example.eformation.models.user.Etudiant;
 import com.example.eformation.models.user.Professeur;
 import com.example.eformation.models.user.User;
+import com.example.eformation.repository.PackRepository;
 import com.example.eformation.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -28,30 +30,57 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final JwtUtils jwtUtils;
+    private final PackRepository packRepository;
 
 
-    //SIGNUP
-    public  User signup(SignupRequest request) {
 
+// SIGNUP
+public User signup(SignupRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
-        }
-
-        User user;
-        String hashedPassword = passwordEncoder.encode(request.getPassword());
-        String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
-
-        switch (request.getRole()) {
-            case PROFESSEUR -> user = new Professeur(request.getFullName(),request.getEmail(),hashedPassword,request.getRole(),request.getUniquePath(),otpCode);
-            case ETUDIANT -> user = new Etudiant(request.getFullName(),request.getEmail(),hashedPassword,request.getRole(),otpCode);
-            default ->  user = new Admin(request.getFullName(),request.getEmail(),hashedPassword,otpCode);
-        }
-
-        User savedUser = userRepository.save(user);
-        emailService.sendOtpEmail(savedUser.getEmail(), otpCode);
-        return savedUser;
+    if (userRepository.existsByEmail(request.getEmail())) {
+        throw new RuntimeException("Email already exists");
     }
+
+    User user;
+    String hashedPassword = passwordEncoder.encode(request.getPassword());
+    String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
+    switch (request.getRole()) {
+        case PROFESSEUR -> {
+            Pack chosenPack = packRepository.findById(request.getPackId())
+                .orElseThrow(() -> new RuntimeException("Pack not found"));
+
+            user = new Professeur(
+                    request.getFullName(),
+                    request.getEmail(),
+                    hashedPassword,
+                    request.getRole(),
+                    request.getUniquePath(),
+                    otpCode,
+                    chosenPack);
+        }
+        case ETUDIANT -> {
+            user = new Etudiant(
+                    request.getFullName(),
+                    request.getEmail(),
+                    hashedPassword,
+                    request.getRole(),
+                    otpCode
+            );
+        }
+        default -> {
+            user = new Admin(
+                    request.getFullName(),
+                    request.getEmail(),
+                    hashedPassword,
+                    otpCode
+            );
+        }
+    }
+
+    User savedUser = userRepository.save(user);
+    emailService.sendOtpEmail(savedUser.getEmail(), otpCode);
+    return savedUser;
+}
 
     //Verify
     public boolean verifyOtp(VerifyOtpRequest req) {

@@ -7,12 +7,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.eformation.dtos.LoginRequest;
-import com.example.eformation.dtos.LoginResponse;
 import com.example.eformation.dtos.PasswordResetRequestDTO;
 import com.example.eformation.dtos.SignupRequest;
 import com.example.eformation.dtos.UpdatePasswordDTO;
 import com.example.eformation.dtos.VerifyOtpRequest;
+import com.example.eformation.dtos.Login.LoginRequest;
+import com.example.eformation.dtos.Login.LoginResponse;
 import com.example.eformation.models.user.User;
 import com.example.eformation.services.AuthService;
 

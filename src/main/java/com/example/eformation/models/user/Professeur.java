@@ -1,5 +1,10 @@
 package com.example.eformation.models.user;
 
+import java.util.List;
+
+import com.example.eformation.models.Packs.Pack;
+import com.example.eformation.models.playlist.PlayList;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,10 +21,15 @@ public class Professeur extends User {
     @Column(unique = true, nullable = true)
     private String uniquePath;
 
-    public Professeur(String fullName, String email, String password, Role role, String uniquePath,String codeOtp) {
+    @ManyToOne
+    @JoinColumn(name = "pack_id")
+    private Pack  pack;
+
+    public Professeur(String fullName, String email, String password, Role role, String uniquePath,String codeOtp,Pack  pack) {
         super(fullName, email, password, role,codeOtp);
         this.isVerifiedByAdmin = false;
         this.uniquePath = uniquePath;
+        this.pack = pack;
     }
 
     public boolean isProfVerified() {

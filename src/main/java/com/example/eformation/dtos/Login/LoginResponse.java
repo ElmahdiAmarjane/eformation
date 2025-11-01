@@ -1,4 +1,4 @@
-package com.example.eformation.dtos;
+package com.example.eformation.dtos.Login;
 
 import com.example.eformation.models.user.Role;
 

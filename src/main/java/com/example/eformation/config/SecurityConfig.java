@@ -32,7 +32,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // activer CORS
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // JWT => pas de session
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // accessible sans token
+                .requestMatchers("/api/**").permitAll() // accessible sans token
                 .anyRequest().authenticated() // les autres endpoints nécessitent auth
             );
 
