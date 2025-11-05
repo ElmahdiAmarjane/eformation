@@ -17,11 +17,10 @@ public class PlaylistController {
     public PlaylistController(PlaylistService playlistService) {
         this.playlistService = playlistService;
     }
-    
+
     @PostMapping("/create")
     public ResponseEntity<PlaylistResponse> createPlaylist(@RequestBody PlaylistRequest request) {
-        PlaylistResponse response = playlistService.createPlaylist(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(playlistService.createPlaylist(request));
     }
 
     @GetMapping("/all")
@@ -29,13 +28,25 @@ public class PlaylistController {
         return ResponseEntity.ok(playlistService.getAllPlaylists());
     }
 
-    // 🔍 Get playlist by ID
     @GetMapping("/{id}")
     public ResponseEntity<PlaylistResponse> getPlaylistById(@PathVariable Long id) {
         return ResponseEntity.ok(playlistService.getPlaylistById(id));
     }
 
-    // 🗑️ Delete playlist
+    @GetMapping("/by-prof/{profId}")
+    public ResponseEntity<List<PlaylistResponse>> getPlaylistsByProfId(@PathVariable Long profId) {
+        return ResponseEntity.ok(playlistService.getPlaylistsByProfId(profId));
+    }
+
+    // ✅ Update playlist by ID
+    @PutMapping("update/{id}")
+    public ResponseEntity<PlaylistResponse> updatePlaylist(
+            @PathVariable Long id,
+            @RequestBody PlaylistRequest request
+    ) {
+        return ResponseEntity.ok(playlistService.updatePlaylist(id, request));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deletePlaylist(@PathVariable Long id) {
         playlistService.deletePlaylist(id);

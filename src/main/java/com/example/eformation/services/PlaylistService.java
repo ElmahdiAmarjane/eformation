@@ -6,8 +6,6 @@ import com.example.eformation.models.playlist.PlayList;
 import com.example.eformation.models.user.Professeur;
 import com.example.eformation.repository.PlaylistRepository;
 import com.example.eformation.repository.ProfesseurRepository;
-import com.example.eformation.repository.PackRepository;
-
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,6 +29,8 @@ public class PlaylistService {
         PlayList playlist = new PlayList();
         playlist.setTitle(request.getTitle());
         playlist.setDescription(request.getDescription());
+        playlist.setVisibility(request.getVisibility());
+        playlist.setMiniature(request.getMiniature());
         playlist.setProfesseur(prof);
 
         PlayList saved = playlistRepository.save(playlist);
@@ -39,6 +39,9 @@ public class PlaylistService {
                 saved.getId(),
                 saved.getTitle(),
                 saved.getDescription(),
+                saved.getVisibility(),
+                saved.getMiniature(),
+                saved.getDateCreation(),
                 prof
         );
     }
@@ -49,7 +52,10 @@ public class PlaylistService {
                         p.getId(),
                         p.getTitle(),
                         p.getDescription(),
-                        p.getProfesseur() != null ? p.getProfesseur() : null
+                        p.getVisibility(),
+                        p.getMiniature(),
+                        p.getDateCreation(),
+                        p.getProfesseur()
                 ))
                 .collect(Collectors.toList());
     }
@@ -61,7 +67,52 @@ public class PlaylistService {
                 p.getId(),
                 p.getTitle(),
                 p.getDescription(),
-                p.getProfesseur() != null ? p.getProfesseur(): null
+                p.getVisibility(),
+                p.getMiniature(),
+                p.getDateCreation(),
+                p.getProfesseur()
+        );
+    }
+
+    // ✅ Get all playlists by professor
+    public List<PlaylistResponse> getPlaylistsByProfId(Long profId) {
+        Professeur professeur = professeurRepository.findById(profId)
+                .orElseThrow(() -> new RuntimeException("Professor not found"));
+
+        return playlistRepository.findByProfesseur(professeur).stream()
+                .map(p -> new PlaylistResponse(
+                        p.getId(),
+                        p.getTitle(),
+                        p.getDescription(),
+                        p.getVisibility(),
+                        p.getMiniature(),
+                        p.getDateCreation(),
+                        p.getProfesseur()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // ✅ Update playlist by ID
+    public PlaylistResponse updatePlaylist(Long id, PlaylistRequest request) {
+        PlayList existing = playlistRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Playlist not found"));
+
+        // Update only the provided fields
+        existing.setTitle(request.getTitle());
+        existing.setDescription(request.getDescription());
+        existing.setVisibility(request.getVisibility());
+        existing.setMiniature(request.getMiniature());
+
+        PlayList updated = playlistRepository.save(existing);
+
+        return new PlaylistResponse(
+                updated.getId(),
+                updated.getTitle(),
+                updated.getDescription(),
+                updated.getVisibility(),
+                updated.getMiniature(),
+                updated.getDateCreation(),
+                updated.getProfesseur()
         );
     }
 

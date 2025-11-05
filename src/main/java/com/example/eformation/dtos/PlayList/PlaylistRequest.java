@@ -1,4 +1,4 @@
-package com.example.eformation.dtos.PlayList ;
+package com.example.eformation.dtos.PlayList;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,4 +12,6 @@ public class PlaylistRequest {
     private Long profId;     
     private String title;
     private String description;
+    private String visibility; // new
+    private String miniature;  // new (image URL or file name)
 }
