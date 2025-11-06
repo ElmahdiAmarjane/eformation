@@ -13,8 +13,14 @@ public class Element {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String titre;
+    @Column(nullable = false)
     private String lien; 
+
+    private String description; 
+
+    private String miniature; 
 
     @Enumerated(EnumType.STRING)
     private ElementType type;
