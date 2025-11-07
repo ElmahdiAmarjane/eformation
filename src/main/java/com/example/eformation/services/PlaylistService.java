@@ -4,7 +4,7 @@ import com.example.eformation.dtos.PlayList.PlaylistRequest;
 import com.example.eformation.dtos.PlayList.PlaylistResponse;
 import com.example.eformation.models.playlist.PlayList;
 import com.example.eformation.models.user.Professeur;
-import com.example.eformation.repository.PlaylistRepository;
+import com.example.eformation.repository.PlayListRepository;
 import com.example.eformation.repository.ProfesseurRepository;
 import org.springframework.stereotype.Service;
 
@@ -14,10 +14,10 @@ import java.util.stream.Collectors;
 @Service
 public class PlaylistService {
 
-    private final PlaylistRepository playlistRepository;
+    private final PlayListRepository playlistRepository;
     private final ProfesseurRepository professeurRepository;
 
-    public PlaylistService(PlaylistRepository playlistRepository, ProfesseurRepository professeurRepository) {
+    public PlaylistService(PlayListRepository playlistRepository, ProfesseurRepository professeurRepository) {
         this.playlistRepository = playlistRepository;
         this.professeurRepository = professeurRepository;
     }

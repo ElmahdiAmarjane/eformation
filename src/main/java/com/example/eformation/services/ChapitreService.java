@@ -5,7 +5,7 @@ import com.example.eformation.dtos.chapitre.ChapitreResponse;
 import com.example.eformation.models.playlist.Chapitre;
 import com.example.eformation.models.playlist.PlayList;
 import com.example.eformation.repository.ChapitreRepository;
-import com.example.eformation.repository.PlaylistRepository;
+import com.example.eformation.repository.PlayListRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class ChapitreService {
 
     private final ChapitreRepository chapitreRepository;
-    private final PlaylistRepository playListRepository;
+    private final PlayListRepository playListRepository;
 
     // ✅ Create a new chapter
     public ChapitreResponse createChapitre(ChapitreRequest request) {

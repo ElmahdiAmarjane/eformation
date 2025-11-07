@@ -7,7 +7,7 @@ import com.example.eformation.models.user.Professeur;
 
 import java.util.List;
 
-public interface PlaylistRepository extends JpaRepository<PlayList, Long> {
+public interface PlayListRepository extends JpaRepository<PlayList, Long> {
     List<PlayList> findByProfesseurId(Long profId);
     List<PlayList> findByProfesseur(Professeur professeur);
 }

@@ -38,4 +38,9 @@ public class PlayList {
     protected void onCreate() {
         this.dateCreation = LocalDateTime.now();
     }
+
+    public String getTitre() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getTitre'");
+    }
 }
