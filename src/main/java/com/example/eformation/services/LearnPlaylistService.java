@@ -5,54 +5,29 @@ import com.example.eformation.models.LearnPlaylist;
 import com.example.eformation.models.playlist.PlayList;
 import com.example.eformation.models.user.Etudiant;
 import com.example.eformation.models.user.Professeur;
-import com.example.eformation.models.user.User;
-import com.example.eformation.repository.LearnPlaylistRepository;
-import com.example.eformation.repository.EtudiantRepository;
-import com.example.eformation.repository.PlayListRepository;
-import com.example.eformation.repository.ProfesseurRepository;
-import com.example.eformation.repository.UserRepository;
-
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import com.example.eformation.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class LearnPlaylistService {
 
     private final LearnPlaylistRepository learnPlaylistRepository;
     private final EtudiantRepository etudiantRepository;
     private final PlayListRepository playListRepository;
     private final ProfesseurRepository professeurRepository;
-    private final JavaMailSender mailSender;
-    private final UserRepository userRepository;
     private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
 
-
-    public LearnPlaylistService(
-            JavaMailSender mailSender,
-            UserRepository userRepository,
-            LearnPlaylistRepository learnPlaylistRepository,
-            EtudiantRepository etudiantRepository,
-            PlayListRepository playListRepository,
-            EmailService emailService,
-            ProfesseurRepository professeurRepository) {
-        this.learnPlaylistRepository = learnPlaylistRepository;
-        this.etudiantRepository = etudiantRepository;
-        this.playListRepository = playListRepository;
-        this.professeurRepository = professeurRepository;
-        this.userRepository = userRepository;
-        this.mailSender = mailSender;
-        this.emailService=emailService;
-    }
-
-    // Save (student requests access) — unchanged behaviour, but return rich DTO
+    // =====================================================
+    // REQUEST ACCESS (student → playlist)
+    // =====================================================
     @Transactional
     public LearnPlaylistResponse requestAccess(Long studentId, Long playlistId) {
         Etudiant student = etudiantRepository.findById(studentId)
@@ -61,158 +36,151 @@ public class LearnPlaylistService {
         PlayList playlist = playListRepository.findById(playlistId)
                 .orElseThrow(() -> new RuntimeException("Playlist not found"));
 
-        Professeur professor = playlist.getProfesseur(); // assuming playlist has getProfessor()
+        Professeur professor = playlist.getProfesseur();
 
-        LearnPlaylist lp = new LearnPlaylist(student, playlist, professor);
-        lp.setVerified(false);
+        LearnPlaylist lp = learnPlaylistRepository
+                .findByEtudiantIdAndPlaylistId(studentId, playlistId)
+                .orElseGet(() -> {
+                    LearnPlaylist newLp = new LearnPlaylist(student, playlist, professor);
+                    newLp.setVerified(false);
+                    return learnPlaylistRepository.save(newLp);
+                });
 
-        LearnPlaylist saved = learnPlaylistRepository.save(lp);
-        return mapToResponse(saved);
+        return mapToResponse(lp);
     }
 
+    // =====================================================
+    // GET STUDENTS
+    // =====================================================
     public List<LearnPlaylistResponse> getAllStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessor_Id(profId)
+        return learnPlaylistRepository.findByProfessorId(profId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     public List<LearnPlaylistResponse> getPendingStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessor_IdAndVerifiedFalse(profId)
+        return learnPlaylistRepository.findByProfessorIdAndVerifiedFalse(profId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     public List<LearnPlaylistResponse> getVerifiedStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessor_IdAndVerifiedTrue(profId)
+        return learnPlaylistRepository.findByProfessorIdAndVerifiedTrue(profId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    // =====================================================
+    // VERIFY / UPDATE
+    // =====================================================
     @Transactional
-    public LearnPlaylistResponse verifyStudent(Long learnPlaylistId) {
-        LearnPlaylist learnPlaylist = learnPlaylistRepository.findById(learnPlaylistId)
-                .orElseThrow(() -> new RuntimeException("LearnPlaylist not found"));
-        learnPlaylist.setVerified(true);
-        LearnPlaylist saved = learnPlaylistRepository.save(learnPlaylist);
-        return mapToResponse(saved);
-    }
-
-    // Map entity -> DTO (rich)
-    private LearnPlaylistResponse mapToResponse(LearnPlaylist lp) {
-        Etudiant e = lp.getEtudiant();
-        PlayList p = lp.getPlaylist();
-        Professeur prof = lp.getProfessor();
-
-        LearnPlaylistResponse.StudentInfo studentInfo = LearnPlaylistResponse.StudentInfo.builder()
-                .id(e.getId())
-                .fullName(getSafeFullName(e))
-                .email(getSafeEmail(e))
-                .build();
-
-        LearnPlaylistResponse.PlaylistInfo playlistInfo = LearnPlaylistResponse.PlaylistInfo.builder()
-                .id(p.getId())
-                .titre(getPlaylistTitleSafe(p))
-                .description(getPlaylistDescriptionSafe(p))
-                .build();
-
-        LearnPlaylistResponse.ProfessorInfo professorInfo = LearnPlaylistResponse.ProfessorInfo.builder()
-                .id(prof != null ? prof.getId() : null)
-                .fullName(prof != null ? getSafeFullName(prof) : null)
-                .email(prof != null ? getSafeEmail(prof) : null)
-                .build();
-
-        return LearnPlaylistResponse.builder()
-                .id(lp.getId())
-                .verified(lp.isVerified())
-                .student(studentInfo)
-                .playlist(playlistInfo)
-                .professor(professorInfo)
-                .build();
-    }
-
-    // Helper safe getters — adapt if your methods differ
-    private String getSafeFullName(Object userEntity) {
-        try {
-            // Etudiant and Professeur extend User with getFullName()
-            return (String) userEntity.getClass().getMethod("getFullName").invoke(userEntity);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private String getSafeEmail(Object userEntity) {
-        try {
-            return (String) userEntity.getClass().getMethod("getEmail").invoke(userEntity);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private String getPlaylistTitleSafe(PlayList p) {
-        try {
-            // try getTitre() first (French) then getTitle() (English)
-            try {
-                return (String) p.getClass().getMethod("getTitre").invoke(p);
-            } catch (NoSuchMethodException ignore) { }
-            try {
-                return (String) p.getClass().getMethod("getTitle").invoke(p);
-            } catch (NoSuchMethodException ignore) { }
-            try {
-                return (String) p.getClass().getMethod("getName").invoke(p);
-            } catch (NoSuchMethodException ignore) { }
-            return null;
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private String getPlaylistDescriptionSafe(PlayList p) {
-        try {
-            return (String) p.getClass().getMethod("getDescription").invoke(p);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     public LearnPlaylistResponse updateVerification(Long learnPlaylistId, boolean verified) {
-        LearnPlaylist learnPlaylist = learnPlaylistRepository.findById(learnPlaylistId)
+        LearnPlaylist lp = learnPlaylistRepository.findById(learnPlaylistId)
                 .orElseThrow(() -> new RuntimeException("LearnPlaylist not found"));
-    
-        learnPlaylist.setVerified(verified);
-        LearnPlaylist updated = learnPlaylistRepository.save(learnPlaylist);
-    
-        return mapToResponse(updated);
+
+        lp.setVerified(verified);
+        return mapToResponse(learnPlaylistRepository.save(lp));
     }
 
+    // =====================================================
+    // DELETE
+    // =====================================================
+    @Transactional
     public void deleteLearnPlaylist(Long id) {
         if (!learnPlaylistRepository.existsById(id)) {
-            throw new RuntimeException("LearnPlaylist not found with id: " + id);
+            throw new RuntimeException("LearnPlaylist not found");
         }
         learnPlaylistRepository.deleteById(id);
     }
 
-    //SEND EMAIL
-    public void sendInvitation(SendInvitationRequest request) {
-        // Optional: fetch prof and playlist info from DB to include in email
-        User professor = userRepository.findById(request.getProfessorId())
+    // =====================================================
+    // SEND INVITATION
+    // =====================================================
+    @Transactional
+    public LearnPlaylistResponse sendInvitation(SendInvitationRequest request) {
+        Professeur professor = professeurRepository.findById(request.getProfessorId())
                 .orElseThrow(() -> new RuntimeException("Professor not found"));
-    
-        // You could fetch playlist details too if needed
-        String playlistTitle = "Your Formation"; // Replace with actual fetch from repository
-    
-        // Construct email message
-        String subject = "Invitation to join formation";
-        String text = String.format(
-                "Bonjour,\n\nVous avez été invité à rejoindre la formation '%s' par le professeur %s.\n\nMerci.",
-                playlistTitle,
-                professor.getFullName()
-        );
-    
-        // Send email
-        emailService.sendEmail(request.getStudentEmail(), subject, text);
+
+        PlayList playlist = playListRepository.findById(request.getPlaylistId())
+                .orElseThrow(() -> new RuntimeException("Playlist not found"));
+
+        Etudiant student = etudiantRepository.findByEmail(request.getStudentEmail())
+                .orElseGet(() -> {
+                    Etudiant s = new Etudiant();
+                    s.setEmail(request.getStudentEmail());
+                    s.setFullName(request.getStudentName());
+                    String tempPassword = generateTempPassword();
+                    s.setPassword(passwordEncoder.encode(tempPassword));
+                    s.setActive(true);
+                    Etudiant saved = etudiantRepository.save(s);
+
+                    emailService.sendEmail(
+                            saved.getEmail(),
+                            "Invitation to join playlist",
+                            buildInvitationEmail(saved, professor, playlist, tempPassword, request.getLoginLink())
+                    );
+                    return saved;
+                });
+
+        LearnPlaylist lp = learnPlaylistRepository
+                .findByEtudiantIdAndPlaylistId(student.getId(), playlist.getId())
+                .orElseGet(() -> {
+                    LearnPlaylist link = new LearnPlaylist(student, playlist, professor);
+                    link.setVerified(true);
+                    return learnPlaylistRepository.save(link);
+                });
+
+        return mapToResponse(lp);
     }
-    
+
+    // =====================================================
+    // HELPERS
+    // =====================================================
+    private String generateTempPassword() {
+        return "Pass@" + (int) (Math.random() * 1_000_000);
+    }
+
+    private String buildInvitationEmail(
+            Etudiant student,
+            Professeur professor,
+            PlayList playlist,
+            String password,
+            String loginLink
+    ) {
+        return String.format(
+                "Bonjour %s,\n\nVous êtes invité à rejoindre la playlist \"%s\" par le professeur %s.\n\n" +
+                        "Email: %s\nMot de passe temporaire: %s\nLien de connexion: %s\n\nMerci.",
+                student.getFullName(),
+                playlist.getTitle(),
+                professor.getFullName(),
+                student.getEmail(),
+                password,
+                loginLink != null ? loginLink : "http://localhost:3000/login"
+        );
+    }
+
+    private LearnPlaylistResponse mapToResponse(LearnPlaylist lp) {
+        return LearnPlaylistResponse.builder()
+                .id(lp.getId())
+                .verified(lp.isVerified())
+                .student(LearnPlaylistResponse.StudentInfo.builder()
+                        .id(lp.getEtudiant().getId())
+                        .fullName(lp.getEtudiant().getFullName())
+                        .email(lp.getEtudiant().getEmail())
+                        .build())
+                .playlist(LearnPlaylistResponse.PlaylistInfo.builder()
+                        .id(lp.getPlaylist().getId())
+                        .titre(lp.getPlaylist().getTitle())
+                        .description(lp.getPlaylist().getDescription())
+                        .build())
+                .professor(LearnPlaylistResponse.ProfessorInfo.builder()
+                        .id(lp.getProfessor().getId())  // Changed from getProfesseur() to getProfessor()
+                        .fullName(lp.getProfessor().getFullName())
+                        .email(lp.getProfessor().getEmail())
+                        .build())
+                .build();
+    }
 }

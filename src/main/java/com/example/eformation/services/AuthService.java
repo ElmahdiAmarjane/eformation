@@ -99,28 +99,38 @@ public User signup(SignupRequest request) {
 
     //LOGIN
     public LoginResponse login(LoginRequest request) {
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
+    
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid password");
         }
-
+    
         if (!user.isActive()) {
-            throw new RuntimeException("User not verified");
+            throw new RuntimeException("Account not verified by OTP");
         }
-
+    
+        // 👇 IMPORTANT PART: block non-verified professors
+        if (user instanceof Professeur professeur) {
+            if (!professeur.isProfVerified()) {
+                throw new RuntimeException("Professor account not yet verified by admin");
+            }
+        }
+    
         String token = jwtUtils.generateToken(user.getEmail());
-
-        // Construire la réponse
+    
         LoginResponse response = new LoginResponse();
+        response.setId(user.getId());
         response.setFullName(user.getFullName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
         response.setToken(token);
-
+    
         return response;
     }
+    
+
 
     //Send Reset Password Request
     public String requestPasswordReset(PasswordResetRequestDTO request) {

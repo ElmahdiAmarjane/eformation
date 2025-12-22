@@ -17,12 +17,19 @@ public class PlaylistService {
     private final PlayListRepository playlistRepository;
     private final ProfesseurRepository professeurRepository;
 
-    public PlaylistService(PlayListRepository playlistRepository, ProfesseurRepository professeurRepository) {
+    public PlaylistService(
+            PlayListRepository playlistRepository,
+            ProfesseurRepository professeurRepository
+    ) {
         this.playlistRepository = playlistRepository;
         this.professeurRepository = professeurRepository;
     }
 
+    // =====================================================
+    // CREATE
+    // =====================================================
     public PlaylistResponse createPlaylist(PlaylistRequest request) {
+
         Professeur prof = professeurRepository.findById(request.getProfId())
                 .orElseThrow(() -> new RuntimeException("Professor not found"));
 
@@ -31,38 +38,70 @@ public class PlaylistService {
         playlist.setDescription(request.getDescription());
         playlist.setVisibility(request.getVisibility());
         playlist.setMiniature(request.getMiniature());
-        playlist.setProfesseur(prof);
+        playlist.setProfesseur(prof); // ✅ FIX
 
         PlayList saved = playlistRepository.save(playlist);
 
-        return new PlaylistResponse(
-                saved.getId(),
-                saved.getTitle(),
-                saved.getDescription(),
-                saved.getVisibility(),
-                saved.getMiniature(),
-                saved.getDateCreation(),
-                prof
-        );
+        return mapToResponse(saved);
     }
 
+    // =====================================================
+    // READ
+    // =====================================================
     public List<PlaylistResponse> getAllPlaylists() {
-        return playlistRepository.findAll().stream()
-                .map(p -> new PlaylistResponse(
-                        p.getId(),
-                        p.getTitle(),
-                        p.getDescription(),
-                        p.getVisibility(),
-                        p.getMiniature(),
-                        p.getDateCreation(),
-                        p.getProfesseur()
-                ))
+        return playlistRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     public PlaylistResponse getPlaylistById(Long id) {
-        PlayList p = playlistRepository.findById(id)
+        PlayList playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Playlist not found"));
+        return mapToResponse(playlist);
+    }
+
+    // =====================================================
+    // READ BY PROFESSOR
+    // =====================================================
+    public List<PlaylistResponse> getPlaylistsByProfId(Long profId) {
+        Professeur professor = professeurRepository.findById(profId)
+                .orElseThrow(() -> new RuntimeException("Professor not found"));
+    
+        return playlistRepository.findByProfesseur(professor)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =====================================================
+    // UPDATE
+    // =====================================================
+    public PlaylistResponse updatePlaylist(Long id, PlaylistRequest request) {
+
+        PlayList existing = playlistRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Playlist not found"));
+
+        existing.setTitle(request.getTitle());
+        existing.setDescription(request.getDescription());
+        existing.setVisibility(request.getVisibility());
+        existing.setMiniature(request.getMiniature());
+
+        PlayList updated = playlistRepository.save(existing);
+        return mapToResponse(updated);
+    }
+
+    // =====================================================
+    // DELETE
+    // =====================================================
+    public void deletePlaylist(Long id) {
+        playlistRepository.deleteById(id);
+    }
+
+    // =====================================================
+    // MAPPER
+    // =====================================================
+    private PlaylistResponse mapToResponse(PlayList p) {
         return new PlaylistResponse(
                 p.getId(),
                 p.getTitle(),
@@ -70,53 +109,7 @@ public class PlaylistService {
                 p.getVisibility(),
                 p.getMiniature(),
                 p.getDateCreation(),
-                p.getProfesseur()
+                p.getProfesseur() // ✅ FIX
         );
-    }
-
-    // ✅ Get all playlists by professor
-    public List<PlaylistResponse> getPlaylistsByProfId(Long profId) {
-        Professeur professeur = professeurRepository.findById(profId)
-                .orElseThrow(() -> new RuntimeException("Professor not found"));
-
-        return playlistRepository.findByProfesseur(professeur).stream()
-                .map(p -> new PlaylistResponse(
-                        p.getId(),
-                        p.getTitle(),
-                        p.getDescription(),
-                        p.getVisibility(),
-                        p.getMiniature(),
-                        p.getDateCreation(),
-                        p.getProfesseur()
-                ))
-                .collect(Collectors.toList());
-    }
-
-    // ✅ Update playlist by ID
-    public PlaylistResponse updatePlaylist(Long id, PlaylistRequest request) {
-        PlayList existing = playlistRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Playlist not found"));
-
-        // Update only the provided fields
-        existing.setTitle(request.getTitle());
-        existing.setDescription(request.getDescription());
-        existing.setVisibility(request.getVisibility());
-        existing.setMiniature(request.getMiniature());
-
-        PlayList updated = playlistRepository.save(existing);
-
-        return new PlaylistResponse(
-                updated.getId(),
-                updated.getTitle(),
-                updated.getDescription(),
-                updated.getVisibility(),
-                updated.getMiniature(),
-                updated.getDateCreation(),
-                updated.getProfesseur()
-        );
-    }
-
-    public void deletePlaylist(Long id) {
-        playlistRepository.deleteById(id);
     }
 }
