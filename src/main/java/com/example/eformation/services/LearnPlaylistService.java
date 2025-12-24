@@ -1,11 +1,16 @@
 package com.example.eformation.services;
 
-import com.example.eformation.dtos.LearnPlaylist.*;
+import com.example.eformation.dtos.LearnPlaylist.LearnPlaylistStudentResponse;
+import com.example.eformation.dtos.LearnPlaylist.SendInvitationRequest;
 import com.example.eformation.models.LearnPlaylist;
 import com.example.eformation.models.playlist.PlayList;
 import com.example.eformation.models.user.Etudiant;
 import com.example.eformation.models.user.Professeur;
-import com.example.eformation.repository.*;
+import com.example.eformation.models.user.Role;
+import com.example.eformation.repository.EtudiantRepository;
+import com.example.eformation.repository.LearnPlaylistRepository;
+import com.example.eformation.repository.PlayListRepository;
+import com.example.eformation.repository.ProfesseurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,169 +23,127 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LearnPlaylistService {
 
-    private final LearnPlaylistRepository learnPlaylistRepository;
     private final EtudiantRepository etudiantRepository;
-    private final PlayListRepository playListRepository;
     private final ProfesseurRepository professeurRepository;
-    private final EmailService emailService;
+    private final PlayListRepository playListRepository;
+    private final LearnPlaylistRepository learnPlaylistRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
-    // =====================================================
-    // REQUEST ACCESS (student → playlist)
-    // =====================================================
     @Transactional
-    public LearnPlaylistResponse requestAccess(Long studentId, Long playlistId) {
-        Etudiant student = etudiantRepository.findById(studentId)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+    public LearnPlaylist sendInvitation(SendInvitationRequest request) {
 
-        PlayList playlist = playListRepository.findById(playlistId)
-                .orElseThrow(() -> new RuntimeException("Playlist not found"));
-
-        Professeur professor = playlist.getProfesseur();
-
-        LearnPlaylist lp = learnPlaylistRepository
-                .findByEtudiantIdAndPlaylistId(studentId, playlistId)
-                .orElseGet(() -> {
-                    LearnPlaylist newLp = new LearnPlaylist(student, playlist, professor);
-                    newLp.setVerified(false);
-                    return learnPlaylistRepository.save(newLp);
-                });
-
-        return mapToResponse(lp);
-    }
-
-    // =====================================================
-    // GET STUDENTS
-    // =====================================================
-    public List<LearnPlaylistResponse> getAllStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessorId(profId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    public List<LearnPlaylistResponse> getPendingStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessorIdAndVerifiedFalse(profId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    public List<LearnPlaylistResponse> getVerifiedStudentsOfProfessor(Long profId) {
-        return learnPlaylistRepository.findByProfessorIdAndVerifiedTrue(profId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    // =====================================================
-    // VERIFY / UPDATE
-    // =====================================================
-    @Transactional
-    public LearnPlaylistResponse updateVerification(Long learnPlaylistId, boolean verified) {
-        LearnPlaylist lp = learnPlaylistRepository.findById(learnPlaylistId)
-                .orElseThrow(() -> new RuntimeException("LearnPlaylist not found"));
-
-        lp.setVerified(verified);
-        return mapToResponse(learnPlaylistRepository.save(lp));
-    }
-
-    // =====================================================
-    // DELETE
-    // =====================================================
-    @Transactional
-    public void deleteLearnPlaylist(Long id) {
-        if (!learnPlaylistRepository.existsById(id)) {
-            throw new RuntimeException("LearnPlaylist not found");
-        }
-        learnPlaylistRepository.deleteById(id);
-    }
-
-    // =====================================================
-    // SEND INVITATION
-    // =====================================================
-    @Transactional
-    public LearnPlaylistResponse sendInvitation(SendInvitationRequest request) {
+        // 1️⃣ Get professor
         Professeur professor = professeurRepository.findById(request.getProfessorId())
                 .orElseThrow(() -> new RuntimeException("Professor not found"));
 
+        // 2️⃣ Get playlist
         PlayList playlist = playListRepository.findById(request.getPlaylistId())
                 .orElseThrow(() -> new RuntimeException("Playlist not found"));
 
+        // 3️⃣ Check if student exists, else create new one
         Etudiant student = etudiantRepository.findByEmail(request.getStudentEmail())
-                .orElseGet(() -> {
-                    Etudiant s = new Etudiant();
-                    s.setEmail(request.getStudentEmail());
-                    s.setFullName(request.getStudentName());
-                    String tempPassword = generateTempPassword();
-                    s.setPassword(passwordEncoder.encode(tempPassword));
-                    s.setActive(true);
-                    Etudiant saved = etudiantRepository.save(s);
+                .orElseGet(() -> createNewStudent(request, professor));
 
-                    emailService.sendEmail(
-                            saved.getEmail(),
-                            "Invitation to join playlist",
-                            buildInvitationEmail(saved, professor, playlist, tempPassword, request.getLoginLink())
-                    );
-                    return saved;
-                });
-
-        LearnPlaylist lp = learnPlaylistRepository
+        // 4️⃣ Grant access to the playlist
+        LearnPlaylist learnPlaylist = learnPlaylistRepository
                 .findByEtudiantIdAndPlaylistId(student.getId(), playlist.getId())
                 .orElseGet(() -> {
-                    LearnPlaylist link = new LearnPlaylist(student, playlist, professor);
-                    link.setVerified(true);
-                    return learnPlaylistRepository.save(link);
+                    LearnPlaylist lp = new LearnPlaylist(student, playlist, professor);
+                    lp.setVerified(false); // default pending
+                    return learnPlaylistRepository.save(lp);
                 });
 
-        return mapToResponse(lp);
+        // 5️⃣ Send email about playlist access (if student already existed)
+        if (etudiantRepository.findByEmail(request.getStudentEmail()).isPresent()) {
+            emailService.sendEmail(
+                    student.getEmail(),
+                    "Accès à la playlist",
+                    buildEmail(student, professor, playlist, request.getLoginLink(), null, false)
+            );
+        }
+
+        return learnPlaylist;
     }
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
-    private String generateTempPassword() {
-        return "Pass@" + (int) (Math.random() * 1_000_000);
-    }
+    private Etudiant createNewStudent(SendInvitationRequest request, Professeur professor) {
+        String tempPassword = generateTempPassword();
+        Etudiant s = new Etudiant();
+        s.setEmail(request.getStudentEmail());
+        s.setFullName(request.getStudentName());
+        s.setPassword(passwordEncoder.encode(tempPassword));
+        s.setActive(true);
+        s.setRole(Role.ETUDIANT);
+        Etudiant savedStudent = etudiantRepository.saveAndFlush(s);
 
-    private String buildInvitationEmail(
-            Etudiant student,
-            Professeur professor,
-            PlayList playlist,
-            String password,
-            String loginLink
-    ) {
-        return String.format(
-                "Bonjour %s,\n\nVous êtes invité à rejoindre la playlist \"%s\" par le professeur %s.\n\n" +
-                        "Email: %s\nMot de passe temporaire: %s\nLien de connexion: %s\n\nMerci.",
-                student.getFullName(),
-                playlist.getTitle(),
-                professor.getFullName(),
-                student.getEmail(),
-                password,
-                loginLink != null ? loginLink : "http://localhost:3000/login"
+        // Send email with temporary password
+        emailService.sendEmail(
+                savedStudent.getEmail(),
+                "Bienvenue sur le système",
+                buildEmail(savedStudent, professor, playListRepository.findById(request.getPlaylistId()).orElse(null), 
+                           request.getLoginLink(), tempPassword, true)
         );
+
+        return savedStudent;
     }
 
-    private LearnPlaylistResponse mapToResponse(LearnPlaylist lp) {
-        return LearnPlaylistResponse.builder()
-                .id(lp.getId())
-                .verified(lp.isVerified())
-                .student(LearnPlaylistResponse.StudentInfo.builder()
-                        .id(lp.getEtudiant().getId())
-                        .fullName(lp.getEtudiant().getFullName())
-                        .email(lp.getEtudiant().getEmail())
-                        .build())
-                .playlist(LearnPlaylistResponse.PlaylistInfo.builder()
-                        .id(lp.getPlaylist().getId())
-                        .titre(lp.getPlaylist().getTitle())
-                        .description(lp.getPlaylist().getDescription())
-                        .build())
-                .professor(LearnPlaylistResponse.ProfessorInfo.builder()
-                        .id(lp.getProfessor().getId())  // Changed from getProfesseur() to getProfessor()
-                        .fullName(lp.getProfessor().getFullName())
-                        .email(lp.getProfessor().getEmail())
-                        .build())
-                .build();
+    @Transactional
+    public LearnPlaylist verifyStudentInPlaylist(Long learnPlaylistId, boolean verified) {
+        LearnPlaylist lp = learnPlaylistRepository.findById(learnPlaylistId)
+                .orElseThrow(() -> new RuntimeException("LearnPlaylist entry not found"));
+
+        lp.setVerified(verified);
+        return learnPlaylistRepository.save(lp);
+    }
+
+    public List<LearnPlaylistStudentResponse> getStudentsByProfessor(Long professorId) {
+        professeurRepository.findById(professorId)
+                .orElseThrow(() -> new RuntimeException("Professor not found"));
+
+        return learnPlaylistRepository.findByProfessorId(professorId)
+                .stream()
+                .map(lp -> LearnPlaylistStudentResponse.builder()
+                        .studentId(lp.getEtudiant().getId())
+                        .studentName(lp.getEtudiant().getFullName())
+                        .studentEmail(lp.getEtudiant().getEmail())
+                        .playlistId(lp.getPlaylist().getId())
+                        .playlistTitle(lp.getPlaylist().getTitle())
+                        .verified(lp.isVerified())
+                        .build()
+                )
+                .collect(Collectors.toList());
+    }
+
+    // ========================
+    // HELPERS
+    // ========================
+    private String generateTempPassword() {
+        return "Pass@" + (int)(Math.random() * 1_000_000);
+    }
+
+    private String buildEmail(Etudiant student, Professeur professor, PlayList playlist, String loginLink, String tempPassword, boolean isNewStudent) {
+        if (isNewStudent) {
+            return String.format(
+                    "Bonjour %s,\n\nVous avez été enregistré par le professeur %s.\n" +
+                    "Vous avez maintenant accès à la playlist \"%s\".\n\n" +
+                    "Email: %s\nMot de passe temporaire: %s\nLien de connexion: %s\n\nMerci.",
+                    student.getFullName(),
+                    professor.getFullName(),
+                    playlist != null ? playlist.getTitle() : "",
+                    student.getEmail(),
+                    tempPassword,
+                    loginLink != null ? loginLink : "http://localhost:3000/login"
+            );
+        } else {
+            return String.format(
+                    "Bonjour %s,\n\nLe professeur %s vous a donné accès à la playlist \"%s\".\n" +
+                    "Email: %s\nLien de connexion: %s\n\nMerci.",
+                    student.getFullName(),
+                    professor.getFullName(),
+                    playlist != null ? playlist.getTitle() : "",
+                    student.getEmail(),
+                    loginLink != null ? loginLink : "http://localhost:3000/login"
+            );
+        }
     }
 }

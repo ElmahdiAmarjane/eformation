@@ -12,26 +12,25 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LearnPlaylist {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @ManyToOne
     @JoinColumn(name = "etudiant_id", nullable = false)
     private Etudiant etudiant;
-    
+
     @ManyToOne
     @JoinColumn(name = "playlist_id", nullable = false)
     private PlayList playlist;
-    
+
     @ManyToOne
-    @JoinColumn(name = "professor_id", nullable = false)  // Column name is professor_id
-    private Professeur professor;  // Field name is professor (with 'o')
-    
+    @JoinColumn(name = "professor_id", nullable = false)
+    private Professeur professor;
+
     private boolean verified = false;
-    
-    // Constructor
+
     public LearnPlaylist(Etudiant etudiant, PlayList playlist, Professeur professor) {
         this.etudiant = etudiant;
         this.playlist = playlist;

@@ -34,4 +34,5 @@ public interface LearnPlaylistRepository extends JpaRepository<LearnPlaylist, Lo
     
     // Additional query if needed
     Optional<LearnPlaylist> findByEtudiantIdAndPlaylistIdAndProfessorId(Long etudiantId, Long playlistId, Long professorId);
+
 }

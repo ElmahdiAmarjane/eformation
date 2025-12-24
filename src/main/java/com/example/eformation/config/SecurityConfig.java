@@ -18,40 +18,58 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // ✅ Encoder pour les mots de passe
+    // ✅ Password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ Configuration principale de la sécurité
+    // ✅ Main security config
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // désactiver CSRF pour test API REST
-            .cors(cors -> cors.configurationSource(corsConfigurationSource())) // activer CORS
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // JWT => pas de session
+            // ❌ Disable CSRF (REST API)
+            .csrf(csrf -> csrf.disable())
+
+            // ✅ Enable CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+            // ❌ No session (stateless API)
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+
+            // ✅ Allow EVERYTHING for /api/**
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").permitAll() // accessible sans token
-                .anyRequest().authenticated() // les autres endpoints nécessitent auth
+                .requestMatchers("/api/**").permitAll()
+                .anyRequest().permitAll()
             );
 
         return http.build();
     }
 
-    // ✅ Configuration CORS
+    // ✅ CORS configuration (Postman + Browser)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
-        
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        
-        config.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // 🔥 Allow ALL origins (Postman + browser)
+        config.setAllowedOriginPatterns(List.of("*"));
+
+        // Allowed HTTP methods
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+
+        // Allow all headers
+        config.setAllowedHeaders(List.of("*"));
+
+        // ❌ MUST be false when using "*"
+        config.setAllowCredentials(false);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", config);
         return source;
     }

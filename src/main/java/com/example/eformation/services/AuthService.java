@@ -14,6 +14,7 @@ import com.example.eformation.models.Packs.Pack;
 import com.example.eformation.models.user.Admin;
 import com.example.eformation.models.user.Etudiant;
 import com.example.eformation.models.user.Professeur;
+import com.example.eformation.models.user.Role;
 import com.example.eformation.models.user.User;
 import com.example.eformation.repository.PackRepository;
 import com.example.eformation.repository.UserRepository;
@@ -63,7 +64,6 @@ public User signup(SignupRequest request) {
                     request.getFullName(),
                     request.getEmail(),
                     hashedPassword,
-                    request.getRole(),
                     otpCode
             );
         }
