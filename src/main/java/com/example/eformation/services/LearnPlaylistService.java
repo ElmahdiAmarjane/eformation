@@ -33,19 +33,33 @@ public class LearnPlaylistService {
     @Transactional
     public LearnPlaylist sendInvitation(SendInvitationRequest request) {
 
-        // 1️⃣ Get professor
         Professeur professor = professeurRepository.findById(request.getProfessorId())
                 .orElseThrow(() -> new RuntimeException("Professor not found"));
 
-        // 2️⃣ Get playlist
         PlayList playlist = playListRepository.findById(request.getPlaylistId())
                 .orElseThrow(() -> new RuntimeException("Playlist not found"));
 
-        // 3️⃣ Check if student exists, else create new one
         Etudiant student = etudiantRepository.findByEmail(request.getStudentEmail())
-                .orElseGet(() -> createNewStudent(request, professor));
+                .orElseGet(() -> {
+                    String tempPassword = generateTempPassword();
+                    Etudiant s = new Etudiant();
+                    s.setEmail(request.getStudentEmail());
+                    s.setFullName(request.getStudentName());
+                    s.setPassword(passwordEncoder.encode(tempPassword));
+                    s.setActive(true);
+                    s.setRole(Role.ETUDIANT);
 
-        // 4️⃣ Grant access to the playlist
+                    Etudiant savedStudent = etudiantRepository.saveAndFlush(s);
+
+                    emailService.sendEmail(
+                            savedStudent.getEmail(),
+                            "Bienvenue sur le système",
+                            buildEmail(savedStudent, professor, playlist, request.getLoginLink(), tempPassword, true)
+                    );
+
+                    return savedStudent;
+                });
+
         LearnPlaylist learnPlaylist = learnPlaylistRepository
                 .findByEtudiantIdAndPlaylistId(student.getId(), playlist.getId())
                 .orElseGet(() -> {
@@ -54,7 +68,7 @@ public class LearnPlaylistService {
                     return learnPlaylistRepository.save(lp);
                 });
 
-        // 5️⃣ Send email about playlist access (if student already existed)
+        // Send email about playlist access if student already existed
         if (etudiantRepository.findByEmail(request.getStudentEmail()).isPresent()) {
             emailService.sendEmail(
                     student.getEmail(),
@@ -64,36 +78,6 @@ public class LearnPlaylistService {
         }
 
         return learnPlaylist;
-    }
-
-    private Etudiant createNewStudent(SendInvitationRequest request, Professeur professor) {
-        String tempPassword = generateTempPassword();
-        Etudiant s = new Etudiant();
-        s.setEmail(request.getStudentEmail());
-        s.setFullName(request.getStudentName());
-        s.setPassword(passwordEncoder.encode(tempPassword));
-        s.setActive(true);
-        s.setRole(Role.ETUDIANT);
-        Etudiant savedStudent = etudiantRepository.saveAndFlush(s);
-
-        // Send email with temporary password
-        emailService.sendEmail(
-                savedStudent.getEmail(),
-                "Bienvenue sur le système",
-                buildEmail(savedStudent, professor, playListRepository.findById(request.getPlaylistId()).orElse(null), 
-                           request.getLoginLink(), tempPassword, true)
-        );
-
-        return savedStudent;
-    }
-
-    @Transactional
-    public LearnPlaylist verifyStudentInPlaylist(Long learnPlaylistId, boolean verified) {
-        LearnPlaylist lp = learnPlaylistRepository.findById(learnPlaylistId)
-                .orElseThrow(() -> new RuntimeException("LearnPlaylist entry not found"));
-
-        lp.setVerified(verified);
-        return learnPlaylistRepository.save(lp);
     }
 
     public List<LearnPlaylistStudentResponse> getStudentsByProfessor(Long professorId) {
@@ -114,6 +98,33 @@ public class LearnPlaylistService {
                 .collect(Collectors.toList());
     }
 
+    public List<LearnPlaylistStudentResponse> getPlaylistsOfStudent(Long studentId) {
+        etudiantRepository.findById(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
+        return learnPlaylistRepository.findByEtudiantId(studentId)
+                .stream()
+                .map(lp -> LearnPlaylistStudentResponse.builder()
+                        .studentId(lp.getEtudiant().getId())
+                        .studentName(lp.getEtudiant().getFullName())
+                        .studentEmail(lp.getEtudiant().getEmail())
+                        .playlistId(lp.getPlaylist().getId())
+                        .playlistTitle(lp.getPlaylist().getTitle())
+                        .verified(lp.isVerified())
+                        .build()
+                )
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public LearnPlaylist verifyStudentInPlaylist(Long learnPlaylistId, boolean verified) {
+        LearnPlaylist lp = learnPlaylistRepository.findById(learnPlaylistId)
+                .orElseThrow(() -> new RuntimeException("LearnPlaylist entry not found"));
+
+        lp.setVerified(verified);
+        return learnPlaylistRepository.save(lp);
+    }
+
     // ========================
     // HELPERS
     // ========================
@@ -129,7 +140,7 @@ public class LearnPlaylistService {
                     "Email: %s\nMot de passe temporaire: %s\nLien de connexion: %s\n\nMerci.",
                     student.getFullName(),
                     professor.getFullName(),
-                    playlist != null ? playlist.getTitle() : "",
+                    playlist.getTitle(),
                     student.getEmail(),
                     tempPassword,
                     loginLink != null ? loginLink : "http://localhost:3000/login"
@@ -140,7 +151,7 @@ public class LearnPlaylistService {
                     "Email: %s\nLien de connexion: %s\n\nMerci.",
                     student.getFullName(),
                     professor.getFullName(),
-                    playlist != null ? playlist.getTitle() : "",
+                    playlist.getTitle(),
                     student.getEmail(),
                     loginLink != null ? loginLink : "http://localhost:3000/login"
             );
